@@ -13,7 +13,8 @@ data class DailyActivityEntity(
 @Entity(tableName = "user_settings")
 data class UserSettingsEntity(
     @PrimaryKey val id: Int = 0,
-    val dailyGoal: Int = 8000
+    val dailyGoal: Int = 8000,
+    val mode: String = "STUDENT"
 )
 
 @Entity(tableName = "achievement")
@@ -41,4 +42,22 @@ data class WeeklyChallengeEntity(
     val targetSteps: Int,
     val progressSteps: Int,
     val completed: Boolean
+)
+
+@Entity(tableName = "exercise_bank")
+data class ExerciseEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    val title: String,
+    val description: String,
+    val defaultReps: Int
+)
+
+@Entity(tableName = "planned_workout")
+data class PlannedWorkoutEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    val dateIso: String,
+    val exerciseId: Long,
+    val title: String,
+    val plannedReps: Int,
+    val sortOrder: Int
 )

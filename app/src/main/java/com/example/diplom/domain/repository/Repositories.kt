@@ -5,6 +5,9 @@ import com.example.diplom.domain.model.DailyStats
 import com.example.diplom.domain.model.PlayerProfile
 import com.example.diplom.domain.model.StoryChapter
 import com.example.diplom.domain.model.WeeklyChallenge
+import com.example.diplom.domain.model.AppUserMode
+import com.example.diplom.domain.model.Exercise
+import com.example.diplom.domain.model.WorkoutExercise
 import kotlinx.coroutines.flow.Flow
 
 interface ActivityRepository {
@@ -30,4 +33,16 @@ interface LeaderboardRepository {
 
 interface SyncRepository {
     suspend fun syncNow(): Boolean
+}
+
+interface TrainingRepository {
+    fun observeUserMode(): Flow<AppUserMode>
+    suspend fun setUserMode(mode: AppUserMode)
+    fun observeExerciseBank(): Flow<List<Exercise>>
+    suspend fun addExercise(title: String, description: String, defaultReps: Int)
+    fun observeTodayWorkout(): Flow<List<WorkoutExercise>>
+    suspend fun addExerciseToTodayWorkout(exercise: Exercise)
+    suspend fun removeWorkoutItem(id: Long)
+    suspend fun exportProgressAsJson(): String
+    suspend fun importProgressFromJson(json: String): Result<Unit>
 }

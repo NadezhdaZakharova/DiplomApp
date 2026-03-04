@@ -23,12 +23,15 @@ import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -38,6 +41,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.diplom.app.AppContainer
 import com.example.diplom.data.sensor.StepCounterManager
+import com.example.diplom.domain.model.AppUserMode
+import com.example.diplom.domain.model.Exercise
 import com.example.diplom.ui.MainUiState
 import com.example.diplom.ui.MainViewModel
 import com.example.diplom.ui.theme.DiplomTheme
@@ -54,7 +61,8 @@ class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels {
         MainViewModel.factory(
             activityRepository = container.activityRepository,
-            gamificationRepository = container.gamificationRepository
+            gamificationRepository = container.gamificationRepository,
+            trainingRepository = container.trainingRepository
         )
     }
     private lateinit var stepCounterManager: StepCounterManager
@@ -146,6 +154,16 @@ fun DiplomApp(viewModel: MainViewModel = viewModel()) {
                     state = uiState,
                     modifier = Modifier.padding(innerPadding)
                 )
+                AppDestinations.TRAINING -> TrainingScreen(
+                    state = uiState,
+                    modifier = Modifier.padding(innerPadding),
+                    onModeSelected = viewModel::setUserMode,
+                    onAddExercise = viewModel::addExercise,
+                    onAddToWorkout = viewModel::addToWorkout,
+                    onRemoveWorkoutItem = viewModel::removeWorkoutItem,
+                    onExport = viewModel::exportProgress,
+                    onImport = viewModel::importProgress
+                )
             }
         }
     }
@@ -159,6 +177,7 @@ enum class AppDestinations(
     FAVORITES("Story", Icons.Default.Favorite),
     PROFILE("Rewards", Icons.Default.AccountBox),
     STATS("Stats", Icons.Default.Star),
+    TRAINING("Training", Icons.Default.Build),
 }
 
 @Composable
@@ -326,6 +345,146 @@ private fun StatisticsScreen(state: MainUiState, modifier: Modifier = Modifier) 
                 ) {
                     Text(day.dateIso)
                     Text("${day.steps} steps")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrainingScreen(
+    state: MainUiState,
+    modifier: Modifier = Modifier,
+    onModeSelected: (AppUserMode) -> Unit,
+    onAddExercise: (String, String, Int) -> Unit,
+    onAddToWorkout: (Exercise) -> Unit,
+    onRemoveWorkoutItem: (Long) -> Unit,
+    onExport: () -> Unit,
+    onImport: (String) -> Unit
+) {
+    var titleInput by rememberSaveable { mutableStateOf("") }
+    var descriptionInput by rememberSaveable { mutableStateOf("") }
+    var repsInput by rememberSaveable { mutableStateOf("10") }
+    var importInput by rememberSaveable { mutableStateOf("") }
+    val clipboard = LocalClipboardManager.current
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Режим использования", fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { onModeSelected(AppUserMode.STUDENT) }) { Text("Ученик") }
+                        Button(onClick = { onModeSelected(AppUserMode.TRAINER) }) { Text("Тренер") }
+                    }
+                    Text("Текущий режим: ${if (state.userMode == AppUserMode.TRAINER) "Тренер" else "Ученик"}")
+                }
+            }
+        }
+
+        if (state.userMode == AppUserMode.TRAINER) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Добавить упражнение в банк", fontWeight = FontWeight.Bold)
+                        OutlinedTextField(
+                            value = titleInput,
+                            onValueChange = { titleInput = it },
+                            label = { Text("Название") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = descriptionInput,
+                            onValueChange = { descriptionInput = it },
+                            label = { Text("Описание") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = repsInput,
+                            onValueChange = { repsInput = it.filter { ch -> ch.isDigit() } },
+                            label = { Text("Повторения по умолчанию") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Button(
+                            onClick = {
+                                onAddExercise(titleInput, descriptionInput, repsInput.toIntOrNull() ?: 10)
+                                titleInput = ""
+                                descriptionInput = ""
+                                repsInput = "10"
+                            }
+                        ) {
+                            Text("Добавить")
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Text("Банк упражнений", fontWeight = FontWeight.Bold)
+        }
+        items(state.exerciseBank) { exercise ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(exercise.title, fontWeight = FontWeight.Medium)
+                    if (exercise.description.isNotBlank()) {
+                        Text(exercise.description)
+                    }
+                    Text("Повторения: ${exercise.defaultReps}")
+                    if (state.userMode == AppUserMode.STUDENT) {
+                        Button(onClick = { onAddToWorkout(exercise) }) { Text("В тренировку") }
+                    }
+                }
+            }
+        }
+
+        item {
+            Text("Тренировка на сегодня", fontWeight = FontWeight.Bold)
+        }
+        items(state.todayWorkout) { item ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("${item.sortOrder + 1}. ${item.title} x ${item.plannedReps}")
+                    TextButton(onClick = { onRemoveWorkoutItem(item.id) }) { Text("Удалить") }
+                }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Экспорт / импорт прогресса", fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onExport) { Text("Сформировать JSON") }
+                        TextButton(
+                            onClick = {
+                                if (state.exportedJson.isNotBlank()) {
+                                    clipboard.setText(AnnotatedString(state.exportedJson))
+                                }
+                            }
+                        ) {
+                            Text("Копировать")
+                        }
+                    }
+                    if (state.exportedJson.isNotBlank()) {
+                        Text("JSON готов. Можно отправить через мессенджер.")
+                    }
+                    OutlinedTextField(
+                        value = importInput,
+                        onValueChange = { importInput = it },
+                        label = { Text("Вставьте JSON для импорта") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(onClick = { onImport(importInput) }) { Text("Импортировать") }
+                    state.importStatus?.let { Text(it) }
                 }
             }
         }

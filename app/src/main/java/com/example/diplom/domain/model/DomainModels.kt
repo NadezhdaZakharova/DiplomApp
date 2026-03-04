@@ -36,3 +36,24 @@ data class WeeklyChallenge(
     val progressSteps: Int,
     val completed: Boolean
 )
+
+enum class AppUserMode {
+    STUDENT,
+    TRAINER
+}
+
+data class Exercise(
+    val id: Long,
+    val title: String,
+    val description: String,
+    val defaultReps: Int
+)
+
+data class WorkoutExercise(
+    val id: Long,
+    val dateIso: String,
+    val exerciseId: Long,
+    val title: String,
+    val plannedReps: Int,
+    val sortOrder: Int
+)

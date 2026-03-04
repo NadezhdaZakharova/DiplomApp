@@ -11,9 +11,11 @@ import androidx.room.RoomDatabase
         UserSettingsEntity::class,
         AchievementEntity::class,
         StoryChapterEntity::class,
-        WeeklyChallengeEntity::class
+        WeeklyChallengeEntity::class,
+        ExerciseEntity::class,
+        PlannedWorkoutEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class DiplomDatabase : RoomDatabase() {
@@ -29,7 +31,7 @@ abstract class DiplomDatabase : RoomDatabase() {
                     context.applicationContext,
                     DiplomDatabase::class.java,
                     "diplom.db"
-                ).build().also { INSTANCE = it }
+                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
             }
     }
 }
